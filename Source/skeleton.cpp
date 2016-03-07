@@ -5,6 +5,7 @@
 #include "TestModel.h"
 
 using namespace std;
+using glm::vec2;
 using glm::vec3;
 using glm::mat3;
 using glm::ivec2;
@@ -34,7 +35,8 @@ void Update();
 void Draw();
 void updateCameraAngle(float angle);
 void VertexShader(const vec3& v, ivec2& p);
-void Interpolate(vec3 a, vec3 b, vector<vec3>& result);
+void Interpolate(ivec2 a, ivec2 b, vector<ivec2>& result);
+void DrawLineSDL(SDL_Surface* surface, ivec2 a, ivec2 b, vec3 color);
 
 int main(int argc, char* argv[])
 {
@@ -98,14 +100,22 @@ void Draw()
 		vertices[0] = triangles[i].v0;
 		vertices[1] = triangles[i].v1;
 		vertices[2] = triangles[i].v2;
+		vector<ivec2> projPoss;
+
+		vec3 color(1,1,1);
 
 		for(int v=0; v<3; ++v)
 		{
 			ivec2 projPos;
 			VertexShader(vertices[v], projPos);
-			vec3 color(1,1,1);
+			projPoss.push_back(projPos);
 			PutPixelSDL(screen, projPos.x, projPos.y, color);
-		}	
+		}
+
+		DrawLineSDL(screen, projPoss[0], projPoss[1], color);
+		DrawLineSDL(screen, projPoss[0], projPoss[2], color);
+		DrawLineSDL(screen, projPoss[1], projPoss[2], color);	
+		projPoss.clear();
 	}
 
 	if(SDL_MUSTLOCK(screen))
@@ -134,14 +144,28 @@ void VertexShader(const vec3& v, ivec2& p)
 	p.y = f*Y/Z + SCREEN_HEIGHT/2;
 }
 
-void Interpolate(vec3 a, vec3 b, vector<vec3>& result)
+void Interpolate(ivec2 a, ivec2 b, vector<ivec2>& result)
 {
-	for( unsigned int i=0; i < result.size(); i++)
+	int N = result.size();
+	vec2 step = vec2(b-a) / float(max(N-1,1));
+	vec2 current(a);
+
+	for(int i=0; i < N; ++i)
 	{
-		result[i].x = a.x + i * (b.x - a.x) / (result.size() - 1);
-		result[i].y = a.y + i * (b.y - a.y) / (result.size() - 1);
-		result[i].z = a.z + i * (b.z - a.z) / (result.size() - 1);
+		result[i] = current;
+		current += step;
 	}
+}
+
+void DrawLineSDL(SDL_Surface* surface, ivec2 a, ivec2 b, vec3 color)
+{
+	ivec2 delta = glm::abs(a-b);
+	int pixels = glm::max(delta.x, delta.y) + 1;
+	vector<ivec2> line(pixels);
+	Interpolate(a, b, line);
+
+	for (size_t i = 0; i < pixels; i++)
+		PutPixelSDL(screen, line[i].x, line[i].y, color);
 }
 
 void updateCameraAngle(float angle) 
