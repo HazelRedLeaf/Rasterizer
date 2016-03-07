@@ -20,13 +20,13 @@ int t;
 vector<Triangle> triangles;
 
 // camera variables
-vec3 cameraPos(0.32f, 0.f, -1.8f);
-float f = 200.f;
-float cameraSpeed = 0.2f;
-float yaw = -M_PI/18.f;
-mat3 R(vec3(1, 1, 1),
-       vec3(1, 1, 1),
-       vec3(1, 1, 1));
+vec3 cameraPos(0.f, 0.f, -3.001f);
+float f = 500.f;
+float cameraSpeed = 0.002f;
+float yaw = 0; // Yaw angle controlling camera rotation around y-axis
+mat3 R(vec3( 0, 0, 1),
+       vec3( 0, 1, 0),
+       vec3(-1, 0, 0));
 
 /* ----------------------------------------------------------------------------*/
 /* FUNCTIONS                                                                   */
@@ -37,6 +37,10 @@ void updateCameraAngle(float angle);
 void VertexShader(const vec3& v, ivec2& p);
 void Interpolate(ivec2 a, ivec2 b, vector<ivec2>& result);
 void DrawLineSDL(SDL_Surface* surface, ivec2 a, ivec2 b, vec3 color);
+void DrawPolygonEdges(const vector<vec3>& vertices);
+void ComputePolygonRows(const vector<ivec2>& vertexPixels, 
+	vector<ivec2>& leftPixels,
+	vector<ivec2>& rightPixels);
 
 int main(int argc, char* argv[])
 {
@@ -100,22 +104,8 @@ void Draw()
 		vertices[0] = triangles[i].v0;
 		vertices[1] = triangles[i].v1;
 		vertices[2] = triangles[i].v2;
-		vector<ivec2> projPoss;
 
-		vec3 color(1,1,1);
-
-		for(int v=0; v<3; ++v)
-		{
-			ivec2 projPos;
-			VertexShader(vertices[v], projPos);
-			projPoss.push_back(projPos);
-			PutPixelSDL(screen, projPos.x, projPos.y, color);
-		}
-
-		DrawLineSDL(screen, projPoss[0], projPoss[1], color);
-		DrawLineSDL(screen, projPoss[0], projPoss[2], color);
-		DrawLineSDL(screen, projPoss[1], projPoss[2], color);	
-		projPoss.clear();
+		DrawPolygonEdges(vertices);
 	}
 
 	if(SDL_MUSTLOCK(screen))
@@ -136,8 +126,8 @@ void VertexShader(const vec3& v, ivec2& p)
 	float Y = v.y - cameraPos.y;
 	float Z = v.z - cameraPos.z;
 	//vec3 P (X, Y, Z);
-	// X = X * R1.x + Z * R1.z;
-	// Z = X * R3.x + Z * R3.z;
+	X = X * R1.x + X * R1.z;
+	Z = Z * R3.x + Z * R3.z;
 
 	// project (X,Y,Z) to (x,y,f)
 	p.x = f*X/Z + SCREEN_WIDTH/2;
@@ -164,8 +154,52 @@ void DrawLineSDL(SDL_Surface* surface, ivec2 a, ivec2 b, vec3 color)
 	vector<ivec2> line(pixels);
 	Interpolate(a, b, line);
 
-	for (size_t i = 0; i < pixels; i++)
+	for (int i = 0; i < pixels; i++)
 		PutPixelSDL(screen, line[i].x, line[i].y, color);
+}
+
+void DrawPolygonEdges(const vector<vec3>& vertices)
+{
+	int V = vertices.size();
+	// Transform each vertex from 3D world position to 2D image position:
+	vector<ivec2> projectedVertices(V);
+	for(int i = 0; i < V; ++i)
+	{
+		VertexShader(vertices[i], projectedVertices[i]);
+	}
+
+	// Loop over all vertices and draw the edge from it to the next vertex:
+	for(int i = 0; i < V; ++i)
+	{
+		int j = (i + 1) % V; // The next vertex
+		vec3 color( 1, 1, 1 );
+		DrawLineSDL(screen, projectedVertices[i], projectedVertices[j], color);
+	}
+}
+
+void ComputePolygonRows(const vector<ivec2>& vertexPixels, vector<ivec2>& leftPixels,
+ vector<ivec2>& rightPixels)
+{
+	// 1. Find max and min y-value of the polygon
+	//    and compute the number of rows it occupies.
+
+	// 2. Resize leftPixels and rightPixels
+	//    so that they have an element for each row.
+	// vector<ivec2> leftPixels(ROWS);
+	// vector<ivec2> rightPixels(ROWS);
+	
+	// for(int i = 0; i < ROWS; ++i)
+	// {
+	// 	leftPixels[i].x  = +numeric_limits<int>::max();
+	// 	rightPixels[i].x = -numeric_limits<int>::max();
+	// }
+	// 3. Initialize the x-coordinates in leftPixels
+	//    to some really large value and the x-coordinates
+	//    in rightPixels to some really small value.
+	// 4. Loop through all edges of the polygon and use
+	//    linear interpolation to find the x-coordinate for
+	//    each row it occupies. Update the corresponding
+	//    values in rightPixels and leftPixels.
 }
 
 void updateCameraAngle(float angle) 
