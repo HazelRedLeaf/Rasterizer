@@ -12,18 +12,20 @@ using glm::ivec2;
 /* ----------------------------------------------------------------------------*/
 /* GLOBAL VARIABLES                                                            */
 
-const int SCREEN_WIDTH = 200;
-const int SCREEN_HEIGHT = 200;
+const int SCREEN_WIDTH = 500;
+const int SCREEN_HEIGHT = 500;
 SDL_Surface* screen;
 int t;
 vector<Triangle> triangles;
 
 // camera variables
-vec3 cameraPos(0.f, 0.f, -3.001f);
-float f = 300.f;
+vec3 cameraPos(0.32f, 0.f, -1.8f);
+float f = 200.f;
 float cameraSpeed = 0.2f;
 float yaw = -M_PI/18.f;
-mat3 R;
+mat3 R(vec3(1, 1, 1),
+       vec3(1, 1, 1),
+       vec3(1, 1, 1));
 
 /* ----------------------------------------------------------------------------*/
 /* FUNCTIONS                                                                   */
@@ -73,14 +75,14 @@ void Update()
     if(keystate[SDLK_DOWN]) {
         cameraPos.z -= cameraSpeed;
     } 
-    // if(keystate[SDLK_LEFT]) {
-    //     cameraPos.x -= cameraSpeed;
-    //     updateCameraAngle(-M_PI/18.f);
-    // } 
-    // if(keystate[SDLK_RIGHT]) {
-    //     cameraPos.x += cameraSpeed;
-    //     updateCameraAngle(M_PI/18.f);
-    // } 
+    if(keystate[SDLK_LEFT]) {
+        cameraPos.x -= cameraSpeed;
+        updateCameraAngle(-M_PI/18.f);
+    } 
+    if(keystate[SDLK_RIGHT]) {
+        cameraPos.x += cameraSpeed;
+        updateCameraAngle(M_PI/18.f);
+    } 
 }
 
 void Draw()
@@ -114,10 +116,18 @@ void Draw()
 
 void VertexShader(const vec3& v, ivec2& p)
 {
+	// column vectors from rotation matrix
+	vec3 R1 (R[0][0], R[1][0], R[2][0]);
+	vec3 R2 (R[0][1], R[1][1], R[2][1]);
+	vec3 R3 (R[0][2], R[1][2], R[2][2]);
+
 	// get position of point in the camera's coordinate system
 	float X = v.x - cameraPos.x;
 	float Y = v.y - cameraPos.y;
 	float Z = v.z - cameraPos.z;
+	//vec3 P (X, Y, Z);
+	// X = X * R1.x + Z * R1.z;
+	// Z = X * R3.x + Z * R3.z;
 
 	// project (X,Y,Z) to (x,y,f)
 	p.x = f*X/Z + SCREEN_WIDTH/2;
