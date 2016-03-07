@@ -19,8 +19,9 @@ int t;
 vector<Triangle> triangles;
 
 // camera variables
-float f = 300.f;
 vec3 cameraPos(0.f, 0.f, -3.001f);
+float f = 300.f;
+float cameraSpeed = 0.2f;
 float yaw = -M_PI/18.f;
 mat3 R;
 
@@ -56,16 +57,6 @@ int main(int argc, char* argv[])
 	return 0;
 }
 
-void updateCameraAngle(float angle) {
-    yaw += angle;
-    //update rotation matrix with angle
-    R = mat3(vec3( cos(angle), 0, sin(angle)),
-             vec3(      0,     1,   0    ),
-             vec3(-sin(angle), 0, cos(angle)));
-    //update camera position with rotation matrix
-    cameraPos = R * cameraPos;
-}
-
 void Update()
 {
 	// Compute frame time:
@@ -73,6 +64,23 @@ void Update()
 	float dt = float(t2-t);
 	t = t2;
 	cout << "Render time: " << dt << " ms." << endl;
+
+	Uint8* keystate = SDL_GetKeyState(0);
+    //Move camera
+    if(keystate[SDLK_UP]) {
+        cameraPos.z += cameraSpeed;
+    } 
+    if(keystate[SDLK_DOWN]) {
+        cameraPos.z -= cameraSpeed;
+    } 
+    // if(keystate[SDLK_LEFT]) {
+    //     cameraPos.x -= cameraSpeed;
+    //     updateCameraAngle(-M_PI/18.f);
+    // } 
+    // if(keystate[SDLK_RIGHT]) {
+    //     cameraPos.x += cameraSpeed;
+    //     updateCameraAngle(M_PI/18.f);
+    // } 
 }
 
 void Draw()
@@ -106,9 +114,12 @@ void Draw()
 
 void VertexShader(const vec3& v, ivec2& p)
 {
-	float X = v.x;
-	float Y = v.y;
-	float Z = v.z;
+	// get position of point in the camera's coordinate system
+	float X = v.x - cameraPos.x;
+	float Y = v.y - cameraPos.y;
+	float Z = v.z - cameraPos.z;
+
+	// project (X,Y,Z) to (x,y,f)
 	p.x = f*X/Z + SCREEN_WIDTH/2;
 	p.y = f*Y/Z + SCREEN_HEIGHT/2;
 }
@@ -121,4 +132,15 @@ void Interpolate(vec3 a, vec3 b, vector<vec3>& result)
 		result[i].y = a.y + i * (b.y - a.y) / (result.size() - 1);
 		result[i].z = a.z + i * (b.z - a.z) / (result.size() - 1);
 	}
+}
+
+void updateCameraAngle(float angle) 
+{
+    yaw += angle;
+    //update rotation matrix with angle
+    R = mat3(vec3( cos(angle), 0, sin(angle)),
+             vec3(      0,     1,   0    ),
+             vec3(-sin(angle), 0, cos(angle)));
+    //update camera position with rotation matrix
+    cameraPos = R * cameraPos;
 }
