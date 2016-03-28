@@ -51,7 +51,7 @@ mat3 R(vec3( 0, 0, 1),
 // light variables
 float lightSpeed = 0.2f;
 vec3 lightPos(0,-0.5,-0.7);
-vec3 lightPower = 17.1f*vec3(1, 1, 1);
+vec3 lightPower = 11.1f*vec3(1, 1, 1);
 vec3 indirectLightPowerPerArea = 0.5f*vec3(1, 1, 1);
 vec3 currentNormal;
 vec3 currentReflectance;
@@ -229,11 +229,11 @@ void Interpolate(Pixel a, Pixel b, vector<Pixel>& result)
 	float stepX = (b.x - a.x) / float(max(N-1,1));
 	float stepY = (b.y - a.y) / float(max(N-1,1));
 	float stepZ = (b.zinv - a.zinv) / float(max(N-1,1));
-	float step3dX = (b.pos3d.x - a.pos3d.x) / float(max(N-1,1));
-	float step3dY = (b.pos3d.y - a.pos3d.y) / float(max(N-1,1));
-	float step3dZ = (b.pos3d.z - a.pos3d.z) / float(max(N-1,1));
+	float step3dX = (b.pos3d.x*b.zinv  - a.pos3d.x*a.zinv) / float(max(N-1,1));
+	float step3dY = (b.pos3d.y*b.zinv  - a.pos3d.y*a.zinv) / float(max(N-1,1));
+	float step3dZ = (b.pos3d.z*b.zinv  - a.pos3d.z*a.zinv) / float(max(N-1,1));
 	float currentX = a.x, currentY = a.y, currentZ = a.zinv, 
-		  current3dX = a.pos3d.x, current3dY = a.pos3d.y, current3dZ = a.pos3d.z;
+		  current3dX = a.pos3d.x * a.zinv, current3dY = a.pos3d.y * a.zinv, current3dZ = a.pos3d.z * a.zinv;
 	float minX = min(a.x,b.x);
 	float maxX = max(a.x,b.x);
 	float minY = min(a.y,b.y);
@@ -253,7 +253,7 @@ void Interpolate(Pixel a, Pixel b, vector<Pixel>& result)
 		result[i].x = (int) currentX;
 		result[i].y = (int) currentY;
 		result[i].zinv = currentZ;
-		result[i].pos3d = vec3(current3dX, current3dY, current3dZ);
+		result[i].pos3d = vec3(current3dX/currentZ, current3dY/currentZ, current3dZ/currentZ);
 		currentX += stepX;
 		currentY += stepY;
 		currentZ += stepZ;
