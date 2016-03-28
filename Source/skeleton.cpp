@@ -22,6 +22,10 @@ struct Pixel {
 	float zinv;
 };
 
+struct Vertex {
+	vec3 position;
+};
+
 
 /* ----------------------------------------------------------------------------*/
 /* GLOBAL VARIABLES                                                            */
@@ -49,16 +53,15 @@ mat3 R(vec3( 0, 0, 1),
 void Update();
 void Draw();
 void updateCameraAngle(float angle);
-void VertexShader(const vec3& v, Pixel& p);
+void VertexShader(const Vertex& v, Pixel& p);
+void PixelShader(const Pixel& p);
 void Interpolate(Pixel a, Pixel b, vector<Pixel>& result);
-void DrawLineSDL(SDL_Surface* surface, ivec2 a, ivec2 b, vec3 color);
-void DrawPolygonEdges(const vector<vec3>& vertices);
 void ComputePolygonRows(const vector<Pixel>& vertexPixels, 
 	vector<Pixel>& leftPixels,
 	vector<Pixel>& rightPixels);
 void DrawPolygonRows(const vector<Pixel>& leftPixels,
 					 const vector<Pixel>& rightPixels);
-void DrawPolygon(const vector<vec3>& vertices);
+void DrawPolygon(const vector<Vertex>& vertices);
 
 int main(int argc, char* argv[])
 {
@@ -124,10 +127,10 @@ void Draw()
 	{
 		currentColor = triangles[i].color;
 
-		vector<vec3> vertices(3);
-		vertices[0] = triangles[i].v0;
-		vertices[1] = triangles[i].v1;
-		vertices[2] = triangles[i].v2;
+		vector<Vertex> vertices(3);
+		vertices[0].position = triangles[i].v0;
+		vertices[1].position = triangles[i].v1;
+		vertices[2].position = triangles[i].v2;
 
 		DrawPolygon(vertices);
 	}
@@ -138,7 +141,7 @@ void Draw()
 	SDL_UpdateRect( screen, 0, 0, 0, 0 );
 }
 
-void VertexShader(const vec3& v, Pixel& p)
+void VertexShader(const Vertex& v, Pixel& p)
 {
 	// column vectors from rotation matrix
 	vec3 R1 (R[0][0], R[1][0], R[2][0]);
@@ -146,9 +149,9 @@ void VertexShader(const vec3& v, Pixel& p)
 	vec3 R3 (R[0][2], R[1][2], R[2][2]);
 
 	// get position of point in the camera's coordinate system
-	float X = v.x - cameraPos.x;
-	float Y = v.y - cameraPos.y;
-	float Z = v.z - cameraPos.z;
+	float X = v.position.x - cameraPos.x;
+	float Y = v.position.y - cameraPos.y;
+	float Z = v.position.z - cameraPos.z;
 	//vec3 P (X, Y, Z);
 	X = X * R1.x + X * R1.z;
 	Z = Z * R3.x + Z * R3.z;
@@ -156,8 +159,17 @@ void VertexShader(const vec3& v, Pixel& p)
 	// project (X,Y,Z) to (x,y,f)
 	p.zinv = 1/Z;
 	p.x = int(f*X/Z) + SCREEN_WIDTH/2;
-	p.y = int(f*Y/Z) + SCREEN_HEIGHT/2;
-	
+	p.y = int(f*Y/Z) + SCREEN_HEIGHT/2;	
+}
+
+void PixelShader(const Pixel& p)
+{
+	int x = p.x;
+	int y = p.y;
+	if(p.zinv > depthBuffer[y][x]) {
+		depthBuffer[y][x] = p.zinv;
+		PutPixelSDL(screen, x, y, currentColor);
+	}
 }
 
 void Interpolate(Pixel a, Pixel b, vector<Pixel>& result)
@@ -269,18 +281,12 @@ void DrawPolygonRows(const vector<Pixel>& leftPixels, const vector<Pixel>& right
 		Interpolate(leftPixels[i], rightPixels[i], row);
 
 		for(const auto& point : row)
-		{
-			if(point.zinv >= depthBuffer[point.y][point.x])
-			{
-				PutPixelSDL(screen, point.x, point.y, currentColor);
-				depthBuffer[point.y][point.x] = point.zinv;
-			}
-		}
+			PixelShader(point);
 	}
 }
 
 // Project the vertices, compute the polygon rows, and draw them
-void DrawPolygon(const vector<vec3>& vertices) {
+void DrawPolygon(const vector<Vertex>& vertices) {
 	int V = vertices.size();
 	vector<Pixel> vertexPixels(V);
 	for(int i = 0; i < V; ++i)
