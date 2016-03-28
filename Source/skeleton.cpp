@@ -20,6 +20,7 @@ struct Pixel {
 	int x;
 	int y;
 	float zinv;
+	vec3 pos3d;
 };
 
 struct Vertex {
@@ -46,6 +47,15 @@ float yaw = 0; // Yaw angle controlling camera rotation around y-axis
 mat3 R(vec3( 0, 0, 1),
        vec3( 0, 1, 0),
        vec3(-1, 0, 0));
+
+// light variables
+vec3 lightPos(0,-0.5,-0.7);
+vec3 lightPower = 17.1f*vec3(1, 1, 1);
+vec3 indirectLightPowerPerArea = 0.5f*vec3(1, 1, 1);
+float lightSpeed = 0.2f;
+vec3 currentNormal;
+vec3 currentReflectance;
+
 
 /* ----------------------------------------------------------------------------*/
 /* FUNCTIONS                                                                   */
@@ -109,7 +119,26 @@ void Update()
     if(keystate[SDLK_RIGHT]) {
         cameraPos.x += cameraSpeed;
         updateCameraAngle(M_PI/18.f);
-    } 
+    }
+    //Move light source
+    if(keystate[SDLK_w]) {
+        lightPos.z += lightSpeed;
+    }
+    if(keystate[SDLK_s]){
+        lightPos.z -= lightSpeed;
+    }
+    if(keystate[SDLK_d]){
+        lightPos.x -= lightSpeed;
+    }
+    if(keystate[SDLK_a]){
+        lightPos.x += lightSpeed;
+    }
+    if(keystate[SDLK_q]){
+        lightPos.y += lightSpeed;
+    }
+    if(keystate[SDLK_e]){
+        lightPos.y -= lightSpeed;
+    }
 }
 
 void Draw()
@@ -125,12 +154,12 @@ void Draw()
 
 	for(size_t i = 0; i < triangles.size(); ++i)
 	{
-		currentColor = triangles[i].color;
-
 		vector<Vertex> vertices(3);
 		vertices[0].position = triangles[i].v0;
 		vertices[1].position = triangles[i].v1;
 		vertices[2].position = triangles[i].v2;
+		currentNormal = triangles[i].normal;
+		currentReflectance = triangles[i].color;
 
 		DrawPolygon(vertices);
 	}
@@ -156,29 +185,55 @@ void VertexShader(const Vertex& v, Pixel& p)
 	X = X * R1.x + X * R1.z;
 	Z = Z * R3.x + Z * R3.z;
 
-	// project (X,Y,Z) to (x,y,f)
+	// store 1/Z for the depth buffer
 	p.zinv = 1/Z;
+	// project (X,Y,Z) to (x,y,f)
 	p.x = int(f*X/Z) + SCREEN_WIDTH/2;
 	p.y = int(f*Y/Z) + SCREEN_HEIGHT/2;	
+	// store the 3D position of the vertex to the corresponding
+	// variable in Pixel
+	p.pos3d = v.position;
 }
 
 void PixelShader(const Pixel& p)
 {
 	int x = p.x;
 	int y = p.y;
+
+	// the current pixel is closer to the camera than what was drawn
+	// at this position before (or infinity - nothing was drawn)
 	if(p.zinv > depthBuffer[y][x]) {
 		depthBuffer[y][x] = p.zinv;
-		PutPixelSDL(screen, x, y, currentColor);
+
+		// vec3 D = lightPower*max(glm::dot(u_r,u_n),0)/4*M_PI*rsq;
+		//Direction from surface point to light source
+    	vec3 r = lightPos - p.pos3d;
+    	//distance between intersection and light source
+    	float dist = glm::length(r);
+    	//distance squared between intersection and light source
+    	float rsq = glm::dot(r, r);
+    	vec3 u_r = glm::normalize(r);
+    	vec3 u_n = currentNormal;
+		float D_prime = max(glm::dot(u_r,u_n),0.f)/((float)4*M_PI*rsq);
+		vec3 D = lightPower*D_prime;
+
+		// R = rho * (D + N)
+		vec3 R = currentReflectance * (D + indirectLightPowerPerArea);
+		PutPixelSDL(screen, x, y, R);
 	}
 }
 
 void Interpolate(Pixel a, Pixel b, vector<Pixel>& result)
 {
 	int N = result.size();
-	float stepX = (b.x-a.x)/ float(max(N-1,1));
-	float stepY = (b.y-a.y)/ float(max(N-1,1));
-	float stepZ = (b.zinv-a.zinv) / float(max(N-1,1)); 
-	float currentX = a.x, currentY = a.y, currentZ = a.zinv;
+	float stepX = (b.x - a.x) / float(max(N-1,1));
+	float stepY = (b.y - a.y) / float(max(N-1,1));
+	float stepZ = (b.zinv - a.zinv) / float(max(N-1,1));
+	float step3dX = (b.pos3d.x - a.pos3d.x) / float(max(N-1,1));
+	float step3dY = (b.pos3d.y - a.pos3d.y) / float(max(N-1,1));
+	float step3dZ = (b.pos3d.z - a.pos3d.z) / float(max(N-1,1));
+	float currentX = a.x, currentY = a.y, currentZ = a.zinv, 
+		  current3dX = a.pos3d.x, current3dY = a.pos3d.y, current3dZ = a.pos3d.z;
 	float minX = min(a.x,b.x);
 	float maxX = max(a.x,b.x);
 	float minY = min(a.y,b.y);
@@ -198,9 +253,13 @@ void Interpolate(Pixel a, Pixel b, vector<Pixel>& result)
 		result[i].x = (int) currentX;
 		result[i].y = (int) currentY;
 		result[i].zinv = currentZ;
+		result[i].pos3d = vec3(current3dX, current3dY, current3dZ);
 		currentX += stepX;
 		currentY += stepY;
 		currentZ += stepZ;
+		current3dX += step3dX;
+		current3dY += step3dY;
+		current3dZ += step3dZ;
 	}
 }
 
@@ -255,11 +314,13 @@ void ComputePolygonRows(const vector<Pixel>& vertexPixels, vector<Pixel>& leftPi
 			if(leftPixels[index].x > edges[i][j].x) {
 				leftPixels[index].x = edges[i][j].x;
 				leftPixels[index].zinv = edges[i][j].zinv;
+				leftPixels[index].pos3d = edges[i][j].pos3d;
 			}
 
 			if(rightPixels[index].x < edges[i][j].x) {
 				rightPixels[index].x = edges[i][j].x;
 				rightPixels[index].zinv = edges[i][j].zinv;
+				rightPixels[index].pos3d = edges[i][j].pos3d;
 			}
 		}
 	}
