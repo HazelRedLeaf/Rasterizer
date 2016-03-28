@@ -1,6 +1,7 @@
 #include <iostream>
 #include <algorithm>
 #include <glm/glm.hpp>
+#include <X11/Xlib.h> 
 #include <SDL.h>
 #include "SDLauxiliary.h"
 #include "TestModel.h"
@@ -53,8 +54,6 @@ float lightSpeed = 0.2f;
 vec3 lightPos(0,-0.5,-0.7);
 vec3 lightPower = 11.1f*vec3(1, 1, 1);
 vec3 indirectLightPowerPerArea = 0.5f*vec3(1, 1, 1);
-vec3 currentNormal;
-vec3 currentReflectance;
 
 
 /* ----------------------------------------------------------------------------*/
@@ -63,20 +62,23 @@ vec3 currentReflectance;
 void Update();
 void Draw();
 void updateCameraAngle(float angle);
-void VertexShader(const Vertex& v, Pixel& p);
-void PixelShader(const Pixel& p);
-void Interpolate(Pixel a, Pixel b, vector<Pixel>& result);
+void VertexShader(const Vertex& v, Pixel& p, vec3 currentNormal, vec3 currentReflectance);
+void PixelShader(const Pixel& p, vec3 currentNormal, vec3 currentReflectance);
+void Interpolate(Pixel a, Pixel b, vector<Pixel>& result, vec3 currentNormal, vec3 currentReflectance);
 void ComputePolygonRows(const vector<Pixel>& vertexPixels, 
 	vector<Pixel>& leftPixels,
-	vector<Pixel>& rightPixels);
+	vector<Pixel>& rightPixels,
+	vec3 currentNormal,
+	vec3 currentReflectance);
 void DrawPolygonRows(const vector<Pixel>& leftPixels,
-					 const vector<Pixel>& rightPixels);
-void DrawPolygon(const vector<Vertex>& vertices);
+					 const vector<Pixel>& rightPixels,
+					 vec3 currentNormal, vec3 currentReflectance);
+void DrawPolygon(const vector<Vertex>& vertices, vec3 currentNormal, vec3 currentReflectance);
 
 int main(int argc, char* argv[])
 {
     //is necessary for multithreaded access
-    //XInitThreads();
+    XInitThreads();
 
 	screen = InitializeSDL(SCREEN_WIDTH, SCREEN_HEIGHT);
 	t = SDL_GetTicks();	// Set start value for timer.
@@ -152,16 +154,17 @@ void Draw()
 		for(int x=0; x<SCREEN_WIDTH; ++x)
 			depthBuffer[y][x] = 0;
 
+	#pragma omp parallel for
 	for(size_t i = 0; i < triangles.size(); ++i)
 	{
 		vector<Vertex> vertices(3);
 		vertices[0].position = triangles[i].v0;
 		vertices[1].position = triangles[i].v1;
 		vertices[2].position = triangles[i].v2;
-		currentNormal = triangles[i].normal;
-		currentReflectance = triangles[i].color;
+		vec3 currentNormal = triangles[i].normal;
+		vec3 currentReflectance = triangles[i].color;
 
-		DrawPolygon(vertices);
+		DrawPolygon(vertices, currentNormal, currentReflectance);
 	}
 
 	if(SDL_MUSTLOCK(screen))
@@ -170,7 +173,7 @@ void Draw()
 	SDL_UpdateRect( screen, 0, 0, 0, 0 );
 }
 
-void VertexShader(const Vertex& v, Pixel& p)
+void VertexShader(const Vertex& v, Pixel& p, vec3 currentNormal, vec3 currentReflectance)
 {
 	// column vectors from rotation matrix
 	vec3 R1 (R[0][0], R[1][0], R[2][0]);
@@ -195,7 +198,7 @@ void VertexShader(const Vertex& v, Pixel& p)
 	p.pos3d = v.position;
 }
 
-void PixelShader(const Pixel& p)
+void PixelShader(const Pixel& p, vec3 currentNormal, vec3 currentReflectance)
 {
 	int x = p.x;
 	int y = p.y;
@@ -223,7 +226,7 @@ void PixelShader(const Pixel& p)
 	}
 }
 
-void Interpolate(Pixel a, Pixel b, vector<Pixel>& result)
+void Interpolate(Pixel a, Pixel b, vector<Pixel>& result, vec3 currentNormal, vec3 currentReflectance)
 {
 	int N = result.size();
 	float stepX = (b.x - a.x) / float(max(N-1,1));
@@ -264,7 +267,7 @@ void Interpolate(Pixel a, Pixel b, vector<Pixel>& result)
 }
 
 void ComputePolygonRows(const vector<Pixel>& vertexPixels, vector<Pixel>& leftPixels,
- vector<Pixel>& rightPixels)
+ vector<Pixel>& rightPixels, vec3 currentNormal, vec3 currentReflectance)
 {
 	// 1. Find max and min y-value of the polygon
 	//    and compute the number of rows it occupies.
@@ -301,7 +304,7 @@ void ComputePolygonRows(const vector<Pixel>& vertexPixels, vector<Pixel>& leftPi
 	for(int i = 0; i < vertexPixels.size() - 1; ++i) {
 		for(int j = i + 1; j < vertexPixels.size(); ++j) {
 			edges[counter].resize((max(abs(vertexPixels[i].x-vertexPixels[j].x),abs(vertexPixels[i].y-vertexPixels[j].y)))+1);
-			Interpolate(vertexPixels[i], vertexPixels[j], edges[counter]);
+			Interpolate(vertexPixels[i], vertexPixels[j], edges[counter], currentNormal, currentReflectance);
 			counter++;
 		}
 	}
@@ -332,31 +335,31 @@ void ComputePolygonRows(const vector<Pixel>& vertexPixels, vector<Pixel>& leftPi
 }
 
 // PutPixelSDL for each pixel between the start and end for each row
-void DrawPolygonRows(const vector<Pixel>& leftPixels, const vector<Pixel>& rightPixels) {
+void DrawPolygonRows(const vector<Pixel>& leftPixels, const vector<Pixel>& rightPixels, vec3 currentNormal, vec3 currentReflectance) {
 	for(int i = 0; i < leftPixels.size(); ++i) {
 		// if (leftPixels[i].x == numeric_limits<int>::max() || rightPixels[i].x == -numeric_limits<int>::max())
 		// 	continue;
 
 		// multiply the whole size by 8 or so for some anti-aliasing
 		vector<Pixel> row((max(abs(leftPixels[i].x-rightPixels[i].x),abs(leftPixels[i].y-rightPixels[i].y)))+1);
-		Interpolate(leftPixels[i], rightPixels[i], row);
+		Interpolate(leftPixels[i], rightPixels[i], row, currentNormal, currentReflectance);
 
 		for(const auto& point : row)
-			PixelShader(point);
+			PixelShader(point, currentNormal, currentReflectance);
 	}
 }
 
 // Project the vertices, compute the polygon rows, and draw them
-void DrawPolygon(const vector<Vertex>& vertices) {
+void DrawPolygon(const vector<Vertex>& vertices, vec3 currentNormal, vec3 currentReflectance) {
 	int V = vertices.size();
 	vector<Pixel> vertexPixels(V);
 	for(int i = 0; i < V; ++i)
-		VertexShader(vertices[i], vertexPixels[i]);
+		VertexShader(vertices[i], vertexPixels[i], currentNormal, currentReflectance);
 
 	vector<Pixel> leftPixels;
 	vector<Pixel> rightPixels;
-	ComputePolygonRows(vertexPixels, leftPixels, rightPixels);
-	DrawPolygonRows(leftPixels, rightPixels);
+	ComputePolygonRows(vertexPixels, leftPixels, rightPixels, currentNormal, currentReflectance);
+	DrawPolygonRows(leftPixels, rightPixels, currentNormal, currentReflectance);
 }
 
 

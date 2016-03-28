@@ -10,9 +10,11 @@ B_DIR=Build
 EXEC=$(B_DIR)/$(FILE)
 
 # default build settings
-CC_OPTS=-c -pipe -Wall -Wno-switch -ggdb -g -O0 -std=c++11
-LN_OPTS=
-CC=g++
+# added -lX11 and -fopenmp for parallelism
+# add -g3 instead of -O3 in CC_OPTS for debug mode
+CC_OPTS=-c -pipe -Wall -Wno-switch -ggdb -O3 -std=c++11
+LN_OPTS=-lX11
+CC=g++ -fopenmp
 
 ########
 #       SDL options
