@@ -49,10 +49,10 @@ mat3 R(vec3( 0, 0, 1),
        vec3(-1, 0, 0));
 
 // light variables
+float lightSpeed = 0.2f;
 vec3 lightPos(0,-0.5,-0.7);
 vec3 lightPower = 17.1f*vec3(1, 1, 1);
 vec3 indirectLightPowerPerArea = 0.5f*vec3(1, 1, 1);
-float lightSpeed = 0.2f;
 vec3 currentNormal;
 vec3 currentReflectance;
 
