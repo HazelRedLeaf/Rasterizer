@@ -32,8 +32,8 @@ struct Vertex {
 /* ----------------------------------------------------------------------------*/
 /* GLOBAL VARIABLES                                                            */
 
-const int SCREEN_WIDTH = 500;
-const int SCREEN_HEIGHT = 500;
+const int SCREEN_WIDTH = 1500;
+const int SCREEN_HEIGHT = 700;
 SDL_Surface* screen;
 int t;
 vector<Triangle> triangles;
@@ -41,13 +41,11 @@ vec3 currentColor;
 float depthBuffer[SCREEN_HEIGHT][SCREEN_WIDTH];
 
 // camera variables
-vec3 cameraPos(0.f, 0.f, -3.001f);
+vec3 cameraPos(0.f, 0.f, -3.501f);
 float f = 500.f;
 float cameraSpeed = 0.002f;
 float yaw = 0; // Yaw angle controlling camera rotation around y-axis
-mat3 R(vec3( 0, 0, 1),
-       vec3( 0, 1, 0),
-       vec3(-1, 0, 0));
+mat3 R;
 
 // light variables
 float lightSpeed = 0.2f;
@@ -75,8 +73,7 @@ void DrawPolygonRows(const vector<Pixel>& leftPixels,
 					 vec3 currentNormal, vec3 currentReflectance);
 void DrawPolygon(const vector<Vertex>& vertices, vec3 currentNormal, vec3 currentReflectance);
 
-int main(int argc, char* argv[])
-{
+int main(int argc, char* argv[]) {
     //is necessary for multithreaded access
     XInitThreads();
 
@@ -88,8 +85,7 @@ int main(int argc, char* argv[])
     //initialize camera angle with default yaw
     updateCameraAngle(yaw);
 
-	while(NoQuitMessageSDL())
-	{
+	while(NoQuitMessageSDL()) {
 		Update();
 		Draw();
 	}
@@ -98,8 +94,7 @@ int main(int argc, char* argv[])
 	return 0;
 }
 
-void Update()
-{
+void Update() {
 	// Compute frame time:
 	int t2 = SDL_GetTicks();
 	float dt = float(t2-t);
@@ -143,8 +138,7 @@ void Update()
     }
 }
 
-void Draw()
-{
+void Draw() {
 	SDL_FillRect(screen, 0, 0);
 
 	if(SDL_MUSTLOCK(screen))
@@ -155,8 +149,7 @@ void Draw()
 			depthBuffer[y][x] = 0;
 
 	#pragma omp parallel for
-	for(size_t i = 0; i < triangles.size(); ++i)
-	{
+	for(size_t i = 0; i < triangles.size(); ++i) {
 		vector<Vertex> vertices(3);
 		vertices[0].position = triangles[i].v0;
 		vertices[1].position = triangles[i].v1;
@@ -173,8 +166,7 @@ void Draw()
 	SDL_UpdateRect( screen, 0, 0, 0, 0 );
 }
 
-void VertexShader(const Vertex& v, Pixel& p, vec3 currentNormal, vec3 currentReflectance)
-{
+void VertexShader(const Vertex& v, Pixel& p, vec3 currentNormal, vec3 currentReflectance) {
 	// column vectors from rotation matrix
 	vec3 R1 (R[0][0], R[1][0], R[2][0]);
 	vec3 R2 (R[0][1], R[1][1], R[2][1]);
@@ -198,8 +190,7 @@ void VertexShader(const Vertex& v, Pixel& p, vec3 currentNormal, vec3 currentRef
 	p.pos3d = v.position;
 }
 
-void PixelShader(const Pixel& p, vec3 currentNormal, vec3 currentReflectance)
-{
+void PixelShader(const Pixel& p, vec3 currentNormal, vec3 currentReflectance) {
 	int x = p.x;
 	int y = p.y;
 
@@ -226,8 +217,7 @@ void PixelShader(const Pixel& p, vec3 currentNormal, vec3 currentReflectance)
 	}
 }
 
-void Interpolate(Pixel a, Pixel b, vector<Pixel>& result, vec3 currentNormal, vec3 currentReflectance)
-{
+void Interpolate(Pixel a, Pixel b, vector<Pixel>& result, vec3 currentNormal, vec3 currentReflectance) {
 	int N = result.size();
 	float stepX = (b.x - a.x) / float(max(N-1,1));
 	float stepY = (b.y - a.y) / float(max(N-1,1));
@@ -242,8 +232,7 @@ void Interpolate(Pixel a, Pixel b, vector<Pixel>& result, vec3 currentNormal, ve
 	float minY = min(a.y,b.y);
 	float maxY = max(a.y,b.y);
 
-	for(int i=0; i < N; ++i)
-	{
+	for(int i=0; i < N; ++i) {
 		if (currentX < minX)
 			currentX = minX;
 		if (currentX > maxX)
@@ -267,8 +256,7 @@ void Interpolate(Pixel a, Pixel b, vector<Pixel>& result, vec3 currentNormal, ve
 }
 
 void ComputePolygonRows(const vector<Pixel>& vertexPixels, vector<Pixel>& leftPixels,
- vector<Pixel>& rightPixels, vec3 currentNormal, vec3 currentReflectance)
-{
+ vector<Pixel>& rightPixels, vec3 currentNormal, vec3 currentReflectance) {
 	// 1. Find max and min y-value of the polygon
 	//    and compute the number of rows it occupies.
 	vector<int> y_s;
@@ -363,8 +351,7 @@ void DrawPolygon(const vector<Vertex>& vertices, vec3 currentNormal, vec3 curren
 }
 
 
-void updateCameraAngle(float angle) 
-{
+void updateCameraAngle(float angle) {
     yaw += angle;
     //update rotation matrix with angle
     R = mat3(vec3( cos(angle), 0, sin(angle)),
