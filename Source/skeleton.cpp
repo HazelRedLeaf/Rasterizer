@@ -32,8 +32,8 @@ struct Vertex {
 /* ----------------------------------------------------------------------------*/
 /* GLOBAL VARIABLES                                                            */
 
-const int SCREEN_WIDTH = 1500;
-const int SCREEN_HEIGHT = 700;
+const int SCREEN_WIDTH = 500;
+const int SCREEN_HEIGHT = 500;
 SDL_Surface* screen;
 int t;
 vector<Triangle> triangles;
@@ -41,7 +41,7 @@ vec3 currentColor;
 float depthBuffer[SCREEN_HEIGHT][SCREEN_WIDTH];
 
 // camera variables
-vec3 cameraPos(0.f, 0.f, -3.501f);
+vec3 cameraPos(0.f, 0.f, -3.001f);
 float f = 500.f;
 float cameraSpeed = 0.002f;
 float yaw = 0; // Yaw angle controlling camera rotation around y-axis
@@ -197,7 +197,9 @@ void PixelShader(const Pixel& p, vec3 currentNormal, vec3 currentReflectance) {
 	// the current pixel is closer to the camera than what was drawn
 	// at this position before (or infinity - nothing was drawn)
 	if(p.zinv > depthBuffer[y][x]) {
+		//cout << "x = " << x << "\n";
 		depthBuffer[y][x] = p.zinv;
+		//cout << "y = " << y << "\n";
 
 		// vec3 D = lightPower*max(glm::dot(u_r,u_n),0)/4*M_PI*rsq;
 		//Direction from surface point to light source
@@ -210,10 +212,13 @@ void PixelShader(const Pixel& p, vec3 currentNormal, vec3 currentReflectance) {
     	vec3 u_n = currentNormal;
 		float D_prime = max(glm::dot(u_r,u_n),0.f)/((float)4*M_PI*rsq);
 		vec3 D = lightPower*D_prime;
+		//cout << "zinv = " << depthBuffer[y][x] << "\n";
 
 		// R = rho * (D + N)
-		vec3 R = currentReflectance * (D + indirectLightPowerPerArea);
-		PutPixelSDL(screen, x, y, R);
+		vec3 Ref = currentReflectance * (D + indirectLightPowerPerArea);
+		
+		PutPixelSDL(screen, x, y, Ref);
+		//cout << "After PutPixelSDL\n";
 	}
 }
 
@@ -332,8 +337,11 @@ void DrawPolygonRows(const vector<Pixel>& leftPixels, const vector<Pixel>& right
 		vector<Pixel> row((max(abs(leftPixels[i].x-rightPixels[i].x),abs(leftPixels[i].y-rightPixels[i].y)))+1);
 		Interpolate(leftPixels[i], rightPixels[i], row, currentNormal, currentReflectance);
 
+		//cout << "Before pixel shader\n";
 		for(const auto& point : row)
-			PixelShader(point, currentNormal, currentReflectance);
+			if(point.x >= 0 && point.x < SCREEN_WIDTH && point.y >= 0 && point.y < SCREEN_HEIGHT)
+				PixelShader(point, currentNormal, currentReflectance);
+
 	}
 }
 
