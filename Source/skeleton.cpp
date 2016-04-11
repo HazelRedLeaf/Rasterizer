@@ -41,10 +41,10 @@ vec3 currentColor;
 float depthBuffer[SCREEN_HEIGHT][SCREEN_WIDTH];
 
 // camera variables
-vec3 cameraPos(0.f, 0.f, -3.001f);
-float f = 500.f;
-float cameraSpeed = 0.002f;
-float yaw = 0; // Yaw angle controlling camera rotation around y-axis
+vec3 cameraPos(0.35f,0.f,-3.f);
+float f = 300.f;
+float cameraSpeed = 0.00002f;
+float yaw = -M_PI/18.f; // Yaw angle controlling camera rotation around y-axis
 mat3 R;
 
 // light variables
@@ -104,18 +104,18 @@ void Update() {
 	Uint8* keystate = SDL_GetKeyState(0);
     //Move camera
     if(keystate[SDLK_UP]) {
-        cameraPos.z += cameraSpeed;
+        cameraPos.z += cameraSpeed*dt;
     } 
     if(keystate[SDLK_DOWN]) {
-        cameraPos.z -= cameraSpeed;
+        cameraPos.z -= cameraSpeed*dt;
     } 
     if(keystate[SDLK_LEFT]) {
-        cameraPos.x -= cameraSpeed;
         updateCameraAngle(-M_PI/18.f);
+        cameraPos.y *= dt;
     } 
     if(keystate[SDLK_RIGHT]) {
-        cameraPos.x += cameraSpeed;
         updateCameraAngle(M_PI/18.f);
+        cameraPos.y *= dt;
     }
     //Move light source
     if(keystate[SDLK_w]) {
@@ -136,6 +136,17 @@ void Update() {
     if(keystate[SDLK_e]){
         lightPos.y -= lightSpeed;
     }
+}
+
+
+void updateCameraAngle(float angle) {
+    yaw += angle;
+    //update rotation matrix with angle
+    R = mat3(vec3( cos(angle), 0, sin(angle)),
+             vec3(      0,     1,   0    ),
+             vec3(-sin(angle), 0, cos(angle)));
+    //update camera position with rotation matrix
+    cameraPos = R * cameraPos;
 }
 
 void Draw() {
@@ -178,7 +189,11 @@ void VertexShader(const Vertex& v, Pixel& p, vec3 currentNormal, vec3 currentRef
 	float Z = v.position.z - cameraPos.z;
 	//vec3 P (X, Y, Z);
 	X = X * R1.x + X * R1.z;
+	Y = Y * R2.y;
 	Z = Z * R3.x + Z * R3.z;
+
+	if (Z == 0)
+		return;
 
 	// store 1/Z for the depth buffer
 	p.zinv = 1/Z;
@@ -356,15 +371,4 @@ void DrawPolygon(const vector<Vertex>& vertices, vec3 currentNormal, vec3 curren
 	vector<Pixel> rightPixels;
 	ComputePolygonRows(vertexPixels, leftPixels, rightPixels, currentNormal, currentReflectance);
 	DrawPolygonRows(leftPixels, rightPixels, currentNormal, currentReflectance);
-}
-
-
-void updateCameraAngle(float angle) {
-    yaw += angle;
-    //update rotation matrix with angle
-    R = mat3(vec3( cos(angle), 0, sin(angle)),
-             vec3(      0,     1,   0    ),
-             vec3(-sin(angle), 0, cos(angle)));
-    //update camera position with rotation matrix
-    cameraPos = R * cameraPos;
 }
