@@ -41,10 +41,10 @@ vec3 currentColor;
 float depthBuffer[SCREEN_HEIGHT][SCREEN_WIDTH];
 
 // camera variables
-vec3 cameraPos(0.35f,0.f,-3.f);
+vec3 cameraPos(0.f,0.f,-2.f);
 float f = 300.f;
 float cameraSpeed = 0.00002f;
-float yaw = -M_PI/18.f; // Yaw angle controlling camera rotation around y-axis
+float yaw = 0; // Yaw angle controlling camera rotation around y-axis
 mat3 R;
 
 // light variables
@@ -99,7 +99,7 @@ void Update() {
 	int t2 = SDL_GetTicks();
 	float dt = float(t2-t);
 	t = t2;
-	cout << "Render time: " << dt << " ms." << endl;
+	//cout << "Render time: " << dt << " ms." << endl;
 
 	Uint8* keystate = SDL_GetKeyState(0);
     //Move camera
@@ -110,12 +110,13 @@ void Update() {
         cameraPos.z -= cameraSpeed*dt;
     } 
     if(keystate[SDLK_LEFT]) {
-        updateCameraAngle(-M_PI/18.f);
-        cameraPos.y *= dt;
+    	cout << dt;
+        updateCameraAngle(1/dt * -M_PI/18.f);
+        //cameraPos.x += cameraSpeed*dt;
     } 
     if(keystate[SDLK_RIGHT]) {
-        updateCameraAngle(M_PI/18.f);
-        cameraPos.y *= dt;
+        updateCameraAngle(1/dt * M_PI/18.f);
+        //cameraPos.x += cameraSpeed*dt;
     }
     //Move light source
     if(keystate[SDLK_w]) {
@@ -147,6 +148,7 @@ void updateCameraAngle(float angle) {
              vec3(-sin(angle), 0, cos(angle)));
     //update camera position with rotation matrix
     cameraPos = R * cameraPos;
+    cout << "Camera: " << cameraPos.x << "," << cameraPos.y << "," << cameraPos.z << endl;
 }
 
 void Draw() {
@@ -178,19 +180,18 @@ void Draw() {
 }
 
 void VertexShader(const Vertex& v, Pixel& p, vec3 currentNormal, vec3 currentReflectance) {
-	// column vectors from rotation matrix
-	vec3 R1 (R[0][0], R[1][0], R[2][0]);
-	vec3 R2 (R[0][1], R[1][1], R[2][1]);
-	vec3 R3 (R[0][2], R[1][2], R[2][2]);
-
 	// get position of point in the camera's coordinate system
 	float X = v.position.x - cameraPos.x;
 	float Y = v.position.y - cameraPos.y;
 	float Z = v.position.z - cameraPos.z;
 	//vec3 P (X, Y, Z);
-	X = X * R1.x + X * R1.z;
-	Y = Y * R2.y;
-	Z = Z * R3.x + Z * R3.z;
+	vec3 Pp = vec3(X,Y,Z);
+
+	Pp = Pp * R;
+
+	X = Pp.x;
+	Y = Pp.y;
+	Z = Pp.z;
 
 	if (Z == 0)
 		return;
