@@ -99,44 +99,33 @@ void Update() {
 	int t2 = SDL_GetTicks();
 	float dt = float(t2-t);
 	t = t2;
-	//cout << "Render time: " << dt << " ms." << endl;
+	cout << "Render time: " << dt << " ms." << endl;
 
 	Uint8* keystate = SDL_GetKeyState(0);
     //Move camera
-    if(keystate[SDLK_UP]) {
+    if(keystate[SDLK_UP])
         cameraPos.z += cameraSpeed*dt;
-    } 
-    if(keystate[SDLK_DOWN]) {
+
+    if(keystate[SDLK_DOWN])
         cameraPos.z -= cameraSpeed*dt;
-    } 
-    if(keystate[SDLK_LEFT]) {
-    	cout << dt;
+    if(keystate[SDLK_LEFT])
         updateCameraAngle(1/dt * -M_PI/18.f);
-        //cameraPos.x += cameraSpeed*dt;
-    } 
-    if(keystate[SDLK_RIGHT]) {
+    if(keystate[SDLK_RIGHT]) 
         updateCameraAngle(1/dt * M_PI/18.f);
-        //cameraPos.x += cameraSpeed*dt;
-    }
+    
     //Move light source
-    if(keystate[SDLK_w]) {
+    if(keystate[SDLK_w])
         lightPos.z += lightSpeed;
-    }
-    if(keystate[SDLK_s]){
+    if(keystate[SDLK_s])
         lightPos.z -= lightSpeed;
-    }
-    if(keystate[SDLK_d]){
+    if(keystate[SDLK_d])
         lightPos.x -= lightSpeed;
-    }
-    if(keystate[SDLK_a]){
+    if(keystate[SDLK_a])
         lightPos.x += lightSpeed;
-    }
-    if(keystate[SDLK_q]){
+    if(keystate[SDLK_q])
         lightPos.y += lightSpeed;
-    }
-    if(keystate[SDLK_e]){
+    if(keystate[SDLK_e])
         lightPos.y -= lightSpeed;
-    }
 }
 
 
@@ -148,7 +137,6 @@ void updateCameraAngle(float angle) {
              vec3(-sin(angle), 0, cos(angle)));
     //update camera position with rotation matrix
     cameraPos = R * cameraPos;
-    cout << "Camera: " << cameraPos.x << "," << cameraPos.y << "," << cameraPos.z << endl;
 }
 
 void Draw() {
