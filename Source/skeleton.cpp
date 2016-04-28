@@ -43,7 +43,7 @@ float depthBuffer[SCREEN_HEIGHT][SCREEN_WIDTH];
 // camera variables
 vec3 cameraPos(0.f,0.f,-2.f);
 float f = 300.f;
-float cameraSpeed = 0.00002f;
+float cameraSpeed = 0.00020f;
 float yaw = 0; // Yaw angle controlling camera rotation around y-axis
 mat3 R;
 float focus = 0.01f;
@@ -82,7 +82,7 @@ void LoadBlenderModel(vector<Triangle>& triangles,string objPath,string matPath)
     vec3 mat;
 
     string filename = "Resources/"+objPath;
-    FILE * file = fopen("Resources/room.obj","r");
+    FILE * file = fopen(filename.c_str(),"r");
     
     if(file == NULL) {
         cout << "Unable to open object file.";
@@ -174,7 +174,8 @@ int main(int argc, char* argv[]) {
 
 	//Load scene triangles
    // LoadTestModel(triangles);
-    LoadBlenderModel(triangles, "room.obj", "room.mtl");
+    LoadBlenderModel(triangles, "Townhouse.obj", "Townhouse.mtl");
+
     //initialize camera angle with default yaw
     updateCameraAngle(yaw);
 
