@@ -46,6 +46,7 @@ float f = 300.f;
 float cameraSpeed = 0.00002f;
 float yaw = 0; // Yaw angle controlling camera rotation around y-axis
 mat3 R;
+float focus = 0.01f;
 
 // light variables
 float lightSpeed = 0.2f;
@@ -59,10 +60,11 @@ vec3 indirectLightPowerPerArea = 0.5f*vec3(1, 1, 1);
 
 void Update();
 void Draw();
+void DrawDepthField();
 void updateCameraAngle(float angle);
 void VertexShader(const Vertex& v, Pixel& p, vec3 currentNormal, vec3 currentReflectance);
 void PixelShader(const Pixel& p, vec3 currentNormal, vec3 currentReflectance);
-void Interpolate(Pixel a, Pixel b, vector<Pixel>& result, vec3 currentNormal, vec3 currentReflectance);
+void Interpolate(Pixel a, Pixel b, vector<Pixel>& result);
 void ComputePolygonRows(const vector<Pixel>& vertexPixels, 
 	vector<Pixel>& leftPixels,
 	vector<Pixel>& rightPixels,
@@ -72,6 +74,94 @@ void DrawPolygonRows(const vector<Pixel>& leftPixels,
 					 const vector<Pixel>& rightPixels,
 					 vec3 currentNormal, vec3 currentReflectance);
 void DrawPolygon(const vector<Vertex>& vertices, vec3 currentNormal, vec3 currentReflectance);
+void LoadBlenderModel(vector<Triangle>& triangles);
+
+void LoadBlenderModel(vector<Triangle>& triangles) {
+    vector<vec3> tmpVs;
+    vector<vec3> tmpNorms;
+    vec3 mat;
+    FILE * file = fopen("Source/boxstack.obj","r");
+    if(file == NULL) {
+        cout << "Unable to open file.";
+        return;
+    }
+
+    while(1) {
+        char type[128];
+        int res = fscanf(file,"%s",type);
+        if(res == EOF)
+            break;
+        // parse vertices
+        if(strcmp(type,"v") == 0) {
+            vec3 v;
+            fscanf(file,"%f %f %f\n",&v.x,&v.y,&v.z);
+            tmpVs.push_back(v);
+        }
+        // parse normals
+        else if(strcmp(type,"vn")==0) {
+            vec3 norm;
+            fscanf(file,"%f %f %f\n",&norm.x,&norm.y,&norm.z);
+            tmpNorms.push_back(norm);
+        }
+        // material / colour
+        else if(strcmp(type,"usemtl")==0){ 
+            char name[128];
+            fscanf(file,"%s\n",name);
+            FILE * matFile = fopen("Source/boxstack.mtl","r");
+            if(matFile == NULL) {
+                cout << "Unable to open file.";
+                return;
+            }
+            // scan mat file
+            while(1) {
+                char t[128];
+                res = fscanf(matFile,"%s",t);
+                if(res == EOF)
+                    break;
+                if(strcmp(t,"newmtl")==0) {
+                    fscanf(matFile,"%s\n",t);
+                    // found mat
+                    if(strcmp(t,name)==0) {
+                        while(1) {
+                            char col[128];
+                            res = fscanf(matFile,"%s",col);
+                            if(res == EOF)
+                                break;
+                            if(strcmp(col,"Kd")==0) {
+                                // set mat properties
+                                fscanf(matFile,"%f %f %f\n",&mat.x,&mat.y,&mat.z);
+                                break;
+                            }
+                            
+                        }
+                    }
+                }
+            }
+            cout << mat.x <<","<<mat.y<<","<<mat.z;
+        }
+        // parse triangle faces
+        else if(strcmp(type,"f")==0) {
+            string v1,v2,v3;
+            unsigned int vIndex[3],normIndex[3];
+            vec3 vs[3];
+            int matches = fscanf(file," %d//%d %d//%d %d//%d\n", &vIndex[0],&normIndex[0],&vIndex[1],&normIndex[1],&vIndex[2],&normIndex[2]);
+            if(matches != 6) 
+                cout << "Failed to parse a face from blender model. ";
+            for(unsigned int i = 0; i < 3; i++) {
+                vs[i] = tmpVs[vIndex[i]-1];
+            }
+ 
+            triangles.push_back(Triangle(vs[0],vs[1],vs[2],mat));
+        }
+        
+    }
+	for( size_t i=0; i<triangles.size(); ++i )
+	{
+
+		triangles[i].ComputeNormal();
+	}
+
+}
 
 int main(int argc, char* argv[]) {
     //is necessary for multithreaded access
@@ -81,7 +171,8 @@ int main(int argc, char* argv[]) {
 	t = SDL_GetTicks();	// Set start value for timer.
 
 	//Load scene triangles
-    LoadTestModel(triangles);
+   // LoadTestModel(triangles);
+    LoadBlenderModel(triangles);
     //initialize camera angle with default yaw
     updateCameraAngle(yaw);
 
@@ -160,11 +251,58 @@ void Draw() {
 
 		DrawPolygon(vertices, currentNormal, currentReflectance);
 	}
-
+    DrawDepthField();
 	if(SDL_MUSTLOCK(screen))
 		SDL_UnlockSurface(screen);
 
 	SDL_UpdateRect( screen, 0, 0, 0, 0 );
+}
+
+void DrawDepthField() {
+    #pragma omp parallel for
+    for(int y = 0; y < SCREEN_HEIGHT; ++y) {
+        for(int x = 0; x < SCREEN_WIDTH; ++x) {
+            if (depthBuffer[y][x] > focus - 0.001f && depthBuffer[y][x] < focus + 0.001f)
+                continue;
+            vec3 averageColor;
+            averageColor =      GetPixelSDL(screen, x-2, y-2) +
+                            4.f*GetPixelSDL(screen, x-1, y-2) +
+                            7.f*GetPixelSDL(screen, x  , y-2) +
+                            4.f*GetPixelSDL(screen, x+1, y-2) +
+                                GetPixelSDL(screen, x+2, y-2) +
+
+                            4.f*GetPixelSDL(screen, x-2, y-1) +
+                           16.f*GetPixelSDL(screen, x-1, y-1) +
+                           26.f*GetPixelSDL(screen, x  , y-1) +
+                           16.f*GetPixelSDL(screen, x+1, y-1) +
+                            4.f*GetPixelSDL(screen, x+2, y-1) +
+
+                            7.f*GetPixelSDL(screen, x-2, y  ) +
+                           26.f*GetPixelSDL(screen, x-1, y  ) +
+                           41.f*GetPixelSDL(screen, x  , y  ) +
+                           26.f*GetPixelSDL(screen, x+1, y  ) +
+                            7.f*GetPixelSDL(screen, x+2, y  ) +
+
+                            4.f*GetPixelSDL(screen, x-2, y+1) +
+                           16.f*GetPixelSDL(screen, x-1, y+1) +
+                           26.f*GetPixelSDL(screen, x  , y+1) +
+                           16.f*GetPixelSDL(screen, x+1, y+1) +
+                            4.f*GetPixelSDL(screen, x+2, y+1) +
+
+                                GetPixelSDL(screen, x-2, y+2) +
+                            4.f*GetPixelSDL(screen, x-1, y+2) +
+                            7.f*GetPixelSDL(screen, x  , y+2) +
+                            4.f*GetPixelSDL(screen, x+1, y+2) +
+                                GetPixelSDL(screen, x+2, y+2);
+
+
+            averageColor.x = averageColor.x/273;
+            averageColor.y = averageColor.y/273;
+            averageColor.z = averageColor.z/273;
+
+            PutPixelSDL( screen, x, y, averageColor);
+        }
+    }
 }
 
 void VertexShader(const Vertex& v, Pixel& p, vec3 currentNormal, vec3 currentReflectance) {
@@ -226,7 +364,7 @@ void PixelShader(const Pixel& p, vec3 currentNormal, vec3 currentReflectance) {
 	}
 }
 
-void Interpolate(Pixel a, Pixel b, vector<Pixel>& result, vec3 currentNormal, vec3 currentReflectance) {
+void Interpolate_Old(Pixel a, Pixel b, vector<Pixel>& result) {
 	int N = result.size();
 	float stepX = (b.x - a.x) / float(max(N-1,1));
 	float stepY = (b.y - a.y) / float(max(N-1,1));
@@ -262,6 +400,43 @@ void Interpolate(Pixel a, Pixel b, vector<Pixel>& result, vec3 currentNormal, ve
 		current3dY += step3dY;
 		current3dZ += step3dZ;
 	}
+}
+
+
+void Bresenham_Interpolate(Pixel a, Pixel b, vector<Pixel>& result) {
+    int x1,y1,x2,y2;
+    //bresenham code
+    x1 = a.x;
+    y1 = a.y;
+    x2 = b.x;
+    y2 = b.y;
+
+    int dx = x2 - x1;
+    result.resize(dx);
+    int dy = y2 - y1;
+    int dxdy2 = 2*dy - 2*dx;
+    int d = 2 * dy - dx;
+    vec3 pos3d = (b.pos3d - a.pos3d)/float(dx);
+
+    float dzinv = (b.zinv - a.zinv)/float(dx);
+
+    for(int i = 0; i < dx; i++) {
+        x1 ++;
+        if(d < 0) {
+            d += 2*dy;
+        }
+        else {
+            d += dxdy2;
+            y1++;
+        }
+        if(x1 < SCREEN_WIDTH && x1 >= 0) {
+            result[i].x = x1;
+            result[i].y = y1;
+            result[i].zinv = a.zinv + dzinv*float(i);
+            result[i].pos3d = a.pos3d+pos3d*float(i);
+        }
+
+    }
 }
 
 void ComputePolygonRows(const vector<Pixel>& vertexPixels, vector<Pixel>& leftPixels,
@@ -300,8 +475,10 @@ void ComputePolygonRows(const vector<Pixel>& vertexPixels, vector<Pixel>& leftPi
 
 	for(int i = 0; i < vertexPixels.size() - 1; ++i) {
 		for(int j = i + 1; j < vertexPixels.size(); ++j) {
-			edges[counter].resize((max(abs(vertexPixels[i].x-vertexPixels[j].x),abs(vertexPixels[i].y-vertexPixels[j].y)))+1);
-			Interpolate(vertexPixels[i], vertexPixels[j], edges[counter], currentNormal, currentReflectance);
+
+            edges[counter].resize((max(abs(vertexPixels[i].x-vertexPixels[j].x),abs(vertexPixels[i].y-vertexPixels[j].y)))+1);
+			Interpolate_Old(vertexPixels[i], vertexPixels[j], edges[counter]);
+
 			counter++;
 		}
 	}
@@ -337,14 +514,17 @@ void DrawPolygonRows(const vector<Pixel>& leftPixels, const vector<Pixel>& right
 		// if (leftPixels[i].x == numeric_limits<int>::max() || rightPixels[i].x == -numeric_limits<int>::max())
 		// 	continue;
 
-		// multiply the whole size by 8 or so for some anti-aliasing
-		vector<Pixel> row((max(abs(leftPixels[i].x-rightPixels[i].x),abs(leftPixels[i].y-rightPixels[i].y)))+1);
-		Interpolate(leftPixels[i], rightPixels[i], row, currentNormal, currentReflectance);
+		//vector<Pixel> row((max(abs(leftPixels[i].x-rightPixels[i].x),abs(leftPixels[i].y-rightPixels[i].y)))+1);
+		//Interpolate_Old(leftPixels[i], rightPixels[i], row);
+
+        vector<Pixel> row;
+        Bresenham_Interpolate(leftPixels[i], rightPixels[i], row);
+
 
 		//cout << "Before pixel shader\n";
-		for(const auto& point : row)
-			if(point.x >= 0 && point.x < SCREEN_WIDTH && point.y >= 0 && point.y < SCREEN_HEIGHT)
-				PixelShader(point, currentNormal, currentReflectance);
+		for(int j = 0; j < row.size(); j++)
+			if(row[j].x >= 0 && row[j].x < SCREEN_WIDTH && row[j].y >= 0 && row[j].y < SCREEN_HEIGHT)
+				PixelShader(row[j], currentNormal, currentReflectance);
 
 	}
 }
