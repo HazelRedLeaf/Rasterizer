@@ -12,7 +12,7 @@ EXEC=$(B_DIR)/$(FILE)
 # default build settings
 # added -lX11 and -fopenmp for parallelism
 # add -g3 instead of -O3 in CC_OPTS for debug mode
-CC_OPTS=-c -pipe -Wall -Wno-switch -g -ggdb -std=c++11
+CC_OPTS=-c -pipe -Wall -Wno-switch -g -ggdb
 LN_OPTS= -lX11
 CC=g++ -fopenmp
 

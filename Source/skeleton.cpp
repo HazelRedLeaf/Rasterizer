@@ -76,13 +76,16 @@ void DrawPolygonRows(const vector<Pixel>& leftPixels,
 void DrawPolygon(const vector<Vertex>& vertices, vec3 currentNormal, vec3 currentReflectance);
 void LoadBlenderModel(vector<Triangle>& triangles);
 
-void LoadBlenderModel(vector<Triangle>& triangles) {
+void LoadBlenderModel(vector<Triangle>& triangles,string objPath,string matPath) {
     vector<vec3> tmpVs;
     vector<vec3> tmpNorms;
     vec3 mat;
-    FILE * file = fopen("Source/boxstack.obj","r");
+
+    string filename = "Resources/"+objPath;
+    FILE * file = fopen("Resources/room.obj","r");
+    
     if(file == NULL) {
-        cout << "Unable to open file.";
+        cout << "Unable to open object file.";
         return;
     }
 
@@ -107,9 +110,10 @@ void LoadBlenderModel(vector<Triangle>& triangles) {
         else if(strcmp(type,"usemtl")==0){ 
             char name[128];
             fscanf(file,"%s\n",name);
-            FILE * matFile = fopen("Source/boxstack.mtl","r");
+            filename = "Resources/"+matPath;
+            FILE * matFile = fopen(filename.c_str(),"r");
             if(matFile == NULL) {
-                cout << "Unable to open file.";
+                cout << "Unable to open material file.";
                 return;
             }
             // scan mat file
@@ -137,30 +141,28 @@ void LoadBlenderModel(vector<Triangle>& triangles) {
                     }
                 }
             }
-            cout << mat.x <<","<<mat.y<<","<<mat.z;
         }
         // parse triangle faces
         else if(strcmp(type,"f")==0) {
             string v1,v2,v3;
             unsigned int vIndex[3],normIndex[3];
             vec3 vs[3];
+            vec3 norms[3];
             int matches = fscanf(file," %d//%d %d//%d %d//%d\n", &vIndex[0],&normIndex[0],&vIndex[1],&normIndex[1],&vIndex[2],&normIndex[2]);
             if(matches != 6) 
                 cout << "Failed to parse a face from blender model. ";
             for(unsigned int i = 0; i < 3; i++) {
                 vs[i] = tmpVs[vIndex[i]-1];
+                norms[i] = tmpNorms[normIndex[i]-1];
             }
- 
-            triangles.push_back(Triangle(vs[0],vs[1],vs[2],mat));
+            Triangle t(vs[0],vs[1],vs[2],mat);
+            // only use one norm for face
+            t.normal = norms[0];
+            
+            triangles.push_back(t);
         }
         
     }
-	for( size_t i=0; i<triangles.size(); ++i )
-	{
-
-		triangles[i].ComputeNormal();
-	}
-
 }
 
 int main(int argc, char* argv[]) {
@@ -172,7 +174,7 @@ int main(int argc, char* argv[]) {
 
 	//Load scene triangles
    // LoadTestModel(triangles);
-    LoadBlenderModel(triangles);
+    LoadBlenderModel(triangles, "room.obj", "room.mtl");
     //initialize camera angle with default yaw
     updateCameraAngle(yaw);
 
@@ -240,7 +242,7 @@ void Draw() {
 		for(int x=0; x<SCREEN_WIDTH; ++x)
 			depthBuffer[y][x] = 0;
 
-	#pragma omp parallel for
+	#pragma omp parallel for 
 	for(size_t i = 0; i < triangles.size(); ++i) {
 		vector<Vertex> vertices(3);
 		vertices[0].position = triangles[i].v0;
