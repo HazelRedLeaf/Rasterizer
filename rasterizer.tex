@@ -110,7 +110,7 @@
 	
 	\section*{1. Compiling and running the code}
 
-	The project includes a Makefile, which compiles the code. It contains the -O3 flag in CC\_Opts so that the code is compiled in the most optimised way. The -lX11 flag is added to the linker options LL\_Opts to allow communication with the X11 Windows Manager. The flag -fopenmp is added to the CC flags. The last two flags allow for parallelism in the code, which will be elaborated on in Section 3. 
+	The project includes a \texttt{Makefile}, which compiles the code. It contains the \texttt{-O3} flag in \texttt{CC\_Opts} so that the code is compiled in the most optimised way. The \texttt{-lX11} flag is added to the linker options \texttt{LL\_Opts} to allow communication with the X11 Windows Manager. The flag \texttt{-fopenmp} is added to the \texttt{CC} flags. The last two flags allow for parallelism in the code, which will be elaborated on in Section 3. 
 	\par
 	The project is compiled and run using the command: \par
 		\texttt{make \&\&  .\textbackslash Build\textbackslash skeleton}
@@ -138,7 +138,12 @@
 	\end{figure}
 	
 	\section*{3. Extensions}
-	Jason does this.
+	\subsection*{Parallelisation via OpenMP}
+	Similarly to the raytracer, the render time was improved by parallelising loops with no data dependencies. This was done with means of OpenMP -- \texttt{pragma omp parallel for} was used above the main \texttt{for} loops in the \texttt{Draw()} function. Until that point, \texttt{vec3 reflectance} was a global variable, however, to make the loop parallelisable, it was passed as an argument -- \texttt{vec3 currentReflectance} -- to all relevant functions.
+	\par
+	Additionally, the \texttt{for} loop in the \texttt{DrawDepthField()} function was also parallelised once completed.
+	\par
+	As mentioned above, the \texttt{-lX11} is necessary to allow communication with the X11 Windows Manager. The flag \texttt{-fopenmp} and the header \texttt{\#include <X11/Xlib.h>} were also needed to allow usage of OpenMP.
 
 	
 \end{document}
