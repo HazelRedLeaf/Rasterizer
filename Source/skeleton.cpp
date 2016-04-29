@@ -43,7 +43,7 @@ float depthBuffer[SCREEN_HEIGHT][SCREEN_WIDTH];
 // camera variables
 vec3 cameraPos(0.f,0.f,-2.f);
 float f = 300.f;
-float cameraSpeed = 0.00020f;
+float cameraSpeed = 0.00005f;
 float yaw = 0; // Yaw angle controlling camera rotation around y-axis
 mat3 R;
 float focus = 0.01f;
@@ -53,7 +53,6 @@ float lightSpeed = 0.2f;
 vec3 lightPos(0,-0.5,-0.7);
 vec3 lightPower = 11.1f*vec3(1, 1, 1);
 vec3 indirectLightPowerPerArea = 0.5f*vec3(1, 1, 1);
-
 
 /* ----------------------------------------------------------------------------*/
 /* FUNCTIONS                                                                   */
@@ -173,8 +172,8 @@ int main(int argc, char* argv[]) {
 	t = SDL_GetTicks();	// Set start value for timer.
 
 	//Load scene triangles
-   // LoadTestModel(triangles);
-    LoadBlenderModel(triangles, "Townhouse.obj", "Townhouse.mtl");
+    LoadTestModel(triangles);
+    //LoadBlenderModel(triangles, "Townhouse.obj", "Townhouse.mtl");
 
     //initialize camera angle with default yaw
     updateCameraAngle(yaw);
