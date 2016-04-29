@@ -73,9 +73,9 @@ void DrawPolygonRows(const vector<Pixel>& leftPixels,
 					 const vector<Pixel>& rightPixels,
 					 vec3 currentNormal, vec3 currentReflectance);
 void DrawPolygon(const vector<Vertex>& vertices, vec3 currentNormal, vec3 currentReflectance);
-void LoadBlenderModel(vector<Triangle>& triangles);
+void LoadOBJModel(vector<Triangle>& triangles);
 
-void LoadBlenderModel(vector<Triangle>& triangles,string objPath,string matPath) {
+void LoadOBJModel(vector<Triangle>& triangles,string objPath,string matPath) {
     vector<vec3> tmpVs;
     vector<vec3> tmpNorms;
     vec3 mat;
@@ -172,8 +172,8 @@ int main(int argc, char* argv[]) {
 	t = SDL_GetTicks();	// Set start value for timer.
 
 	//Load scene triangles
-    LoadTestModel(triangles);
-    //LoadBlenderModel(triangles, "Townhouse.obj", "Townhouse.mtl");
+    //LoadTestModel(triangles);
+    LoadOBJModel(triangles, "Townhouse.obj", "Townhouse.mtl");
 
     //initialize camera angle with default yaw
     updateCameraAngle(yaw);
