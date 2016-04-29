@@ -172,8 +172,8 @@ int main(int argc, char* argv[]) {
 	t = SDL_GetTicks();	// Set start value for timer.
 
 	//Load scene triangles
-    //LoadTestModel(triangles);
-    LoadOBJModel(triangles, "Townhouse.obj", "Townhouse.mtl");
+    LoadTestModel(triangles);
+    //LoadOBJModel(triangles, "Townhouse.obj", "Townhouse.mtl");
 
     //initialize camera angle with default yaw
     updateCameraAngle(yaw);
